@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31702.278
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKS_TreeNodeNaming", "TreeNodeNaming\KKS_TreeNodeNaming.csproj", "{D99A5DE9-0D42-463A-BB88-8756652F6D02}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKS_TreeNodeNaming", "KKS_TreeNodeNaming\KKS_TreeNodeNaming.csproj", "{D99A5DE9-0D42-463A-BB88-8756652F6D02}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KK_TreeNodeNaming", "KK_TreeNodeNaming\KK_TreeNodeNaming.csproj", "{6C661463-7BEF-487C-8A0B-BCEAD80CB7AC}"
 EndProject

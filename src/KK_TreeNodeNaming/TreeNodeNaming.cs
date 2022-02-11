@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Text;
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using BepInEx;
-using BepInEx.Configuration;
 using BepInEx.Logging;
+using BepInEx.Configuration;
 using KKAPI;
 using Studio;
 using KKAPI.Studio.SaveLoad;
@@ -13,161 +15,176 @@ using MessagePack;
 
 namespace TreeNodeNaming
 {
-    
     [BepInDependency(ExtendedSave.GUID, ExtendedSave.Version)]
     [BepInDependency(KoikatuAPI.GUID, KoikatuAPI.VersionConst)]
     [BepInPlugin(GUID, PluginName, Version)]
     [BepInProcess("CharaStudio")]
-    public class TreeNodeNaming: BaseUnityPlugin
+    public class TreeNodeNaming : BaseUnityPlugin
     {
-        public const string PluginName = "KK_TreeNodeNaming";
+        public const string PluginName = "TreeNodeNaming";
         public const string GUID = "org.njaecha.plugins.treenodenaming";
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
 
         internal new static ManualLogSource Logger;
 
-        internal static bool ui = false;
-        internal static bool uiActive = true;
+        internal static bool uiActive = false;
 
-        private int uiX;
-        private int uiY;
-        private Rect windowRect = new Rect(100, 100, 200, 80);
-        private string inputString = "";
-        
-        internal static TreeNodeCtrl tnc = new TreeNodeCtrl();
+        private StringBuilder inputStringBuilder = new StringBuilder();
+
+        private Dictionary<TreeNodeObject, string> oldTnoNames = new Dictionary<TreeNodeObject, string>();
+        private string cursor = " ";
+        private int cursorPosition;
 
         private ConfigEntry<KeyboardShortcut> hotkey;
 
-        public void Awake()
+        private TreeNodeCtrl treeNodeCtrl;
+
+
+        void Awake()
         {
-            KKAPI.Studio.StudioAPI.StudioLoadedChanged += registerTreeNodeCtrl;
+
             TreeNodeNaming.Logger = base.Logger;
             StudioSaveLoadApi.RegisterExtraBehaviour<SceneController>(GUID);
-            KeyboardShortcut defaultShortcut = new KeyboardShortcut(KeyCode.L);
-            hotkey = Config.Bind("General", "Hotkey", defaultShortcut, "Press this key to open UI");
+            KeyboardShortcut defaultShortcut = new KeyboardShortcut(KeyCode.R, KeyCode.LeftShift);
+            hotkey = Config.Bind("General", "Hotkey", defaultShortcut, "Press this key to rename selected objects");
+            KKAPI.Studio.StudioAPI.StudioLoadedChanged += registerCtrls;
         }
-        public void registerTreeNodeCtrl(object sender, EventArgs e)
+
+        private void registerCtrls(object sender, EventArgs e)
         {
-            tnc = Singleton<Studio.Studio>.Instance.treeNodeCtrl;
-            if (tnc)
+            treeNodeCtrl = Singleton<Studio.Studio>.Instance.treeNodeCtrl;
+        }
+        void OnGUI()
+        {
+            if (uiActive)
             {
-                tnc.onSelect += delegate { setUi(true); };
-                tnc.onDeselect += delegate { setUi(false); };
-                tnc.onDelete += delegate { setUi(false); };
+                if (Event.current.type == EventType.KeyDown && Event.current.keyCode != KeyCode.None)
+                {
+                    switch (Event.current.keyCode)
+                    {
+                        case KeyCode.Escape:
+                            CancelInvoke();
+                            foreach (TreeNodeObject tno in oldTnoNames.Keys)
+                                tno.textName = oldTnoNames[tno];
+                            uiActive = false;
+                            break;
+                        case KeyCode.Return:
+                            CancelInvoke();
+                            renameCurrentItems(inputStringBuilder.ToString());
+                            uiActive = false;
+                            break;
+                        case KeyCode.Backspace:
+                            if (inputStringBuilder.Length > 0)
+                            {
+                                inputStringBuilder.Remove(cursorPosition - 1, 1);
+                                cursorPosition--;
+                                renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
+                            }
+                            break;
+                        case KeyCode.Delete:
+                            if (inputStringBuilder.Length > 0 && cursorPosition != inputStringBuilder.Length)
+                            {
+                                inputStringBuilder.Remove(cursorPosition, 1);
+                                renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
+                            }
+                            break;
+                        case KeyCode.LeftArrow:
+                            if (cursorPosition > 0)
+                            {
+                                cursorPosition--;
+                                renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
+                            }
+                            break;
+                        case KeyCode.RightArrow:
+                            if (cursorPosition < inputStringBuilder.Length)
+                            {
+                                cursorPosition++;
+                                renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
+                            }
+                            break;
+                        default:
+                            int a = inputStringBuilder.Length;
+                            inputStringBuilder.Insert(cursorPosition, Input.inputString);
+                            if (a != inputStringBuilder.Length)
+                            {
+                                cursorPosition++;
+                                renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
+                            }
+                            break;
+                    }
+                }
+                Input.ResetInputAxes();
             }
         }
-        public void OnGUI()
-        {
-            if (ui)
-            {
-                windowRect = GUI.Window(77, windowRect, WindowFunction, "Rename Tree Node");
-                KKAPI.Utilities.IMGUIUtils.EatInputInRect(windowRect);
-            }
-        }
+
         void Update()
         {
             if (hotkey.Value.IsDown())
             {
+                if (treeNodeCtrl.selectNode == null) return;
+                inputStringBuilder.Remove(0, inputStringBuilder.Length);
+                inputStringBuilder.Append(treeNodeCtrl.selectNode.textName);
+                cursorPosition = inputStringBuilder.Length;
+                oldTnoNames.Clear();
+                foreach (ObjectCtrlInfo oci in KKAPI.Studio.StudioAPI.GetSelectedObjects())
+                {
+                    oldTnoNames[oci.treeNodeObject] = oci.treeNodeObject.textName;
+                }
+
                 uiActive = !uiActive;
-                setUi(uiActive);
+                InvokeRepeating("cursorBlinking", 0f, 0.5f);
             }
         }
-        public void setUi(bool state)
-        {
-            if (!state)
-            {
-                ui = false;
-                return;
-            }
 
-            IEnumerable<ObjectCtrlInfo> selectedObjects = KKAPI.Studio.StudioAPI.GetSelectedObjects();
-            bool renambaleSeclected = false;
-            uiX = (int)(Screen.width * 0.805 - 200);
-            uiY = (int)(Screen.height * 0.075);
-            windowRect.x = uiX;
-            windowRect.y = uiY;
-            foreach (ObjectCtrlInfo oci in selectedObjects)
-            {
-                if (oci is OCIItem || oci is OCIChar)
-                {
-                    renambaleSeclected = true;
-                    break;
-                }
-            }
+        private void cursorBlinking()
+        {
             if (uiActive)
-                ui = renambaleSeclected;
-
-        }
-        private void WindowFunction(int WindowID)
-        {
-            inputString = GUI.TextField(new Rect(10, 20, 180, 20), inputString);
-            if (GUI.Button(new Rect(10, 50, 180, 20), "Rename"))
             {
+                if (cursor == "¦") cursor = "|";
+                else cursor = "¦";
+                renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
+            }
+        }
 
-                IEnumerable<ObjectCtrlInfo> selectedObjects = KKAPI.Studio.StudioAPI.GetSelectedObjects();
-                foreach (ObjectCtrlInfo oci in selectedObjects)
+        public static void renameCurrentItems(string name)
+        {
+            foreach (ObjectCtrlInfo oci in KKAPI.Studio.StudioAPI.GetSelectedObjects())
+            {
+                switch (oci.kind)
                 {
-                    renameItem(oci.treeNodeObject, inputString);
+                    case 3:
+                        ((OCIFolder)oci).name = name;
+                        break;
+                    case 4:
+                        ((OCIRoute)oci).name = name;
+                        break;
+                    case 5:
+                        ((OCICamera)oci).name = name;
+                        break;
+                    default:
+                        oci.treeNodeObject.textName = name;
+                        break;
                 }
             }
-            //GUI.DragWindow();
         }
-        public static void renameItem(TreeNodeObject tno, string name)
+        public static void renameItem(ObjectCtrlInfo oci, string name)
         {
-            tno.textName = name;
-        }
-    }
-
-    public class SceneController: SceneCustomFunctionController
-    {
-        protected override void OnSceneSave()
-        {
-            var data = new PluginData();
-
-            Dictionary<int, ObjectCtrlInfo> idObjectPairs = Studio.Studio.Instance.dicObjectCtrl;
-            Dictionary<int, string> idNamePairs = new Dictionary<int, string>();
-
-            foreach(int id in idObjectPairs.Keys)
+            switch (oci.kind)
             {
-                idNamePairs[id] = idObjectPairs[id].treeNodeObject.textName;
-            }
-
-            if (idNamePairs.Count > 0)
-            {
-                data.data.Add("names", MessagePackSerializer.Serialize(idNamePairs));
-            }
-            else data.data.Add("names", null);
-
-            SetExtendedData(data);
-        }
-
-        protected override void OnSceneLoad(SceneOperationKind operation, ReadOnlyDictionary<int, ObjectCtrlInfo> loadedItems)
-        {
-            TreeNodeNaming.ui = false;
-
-            if (operation == SceneOperationKind.Clear) return;
-
-            var data = GetExtendedData();
-
-            if (data?.data == null) return;
-
-            Dictionary<int, string> idNamePairs = new Dictionary<int, string>();
-            if (data.data.TryGetValue("names", out var temp) && temp != null)
-            {
-                idNamePairs = MessagePackSerializer.Deserialize<Dictionary<int, string>>((byte[])temp);
-                foreach (int id in idNamePairs.Keys)
-                    TreeNodeNaming.renameItem(loadedItems[id].treeNodeObject, idNamePairs[id]);
-            }
-            else TreeNodeNaming.Logger.LogError("failed to obtain pluginData from OnLoad event");
-        }
-        protected override void OnObjectsCopied(ReadOnlyDictionary<Int32, ObjectCtrlInfo> copiedItems)
-        {
-            Dictionary<int, ObjectCtrlInfo> sceneObjects = Studio.Studio.Instance.dicObjectCtrl;
-            foreach (int id in copiedItems.Keys)
-            {
-                if (copiedItems[id] is OCIItem || copiedItems[id] is OCIChar)
-                    copiedItems[id].treeNodeObject.textName = sceneObjects[id].treeNodeObject.textName;
+                case 3:
+                    ((OCIFolder)oci).name = name;
+                    break;
+                case 4:
+                    ((OCIRoute)oci).name = name;
+                    break;
+                case 5:
+                    ((OCICamera)oci).name = name;
+                    break;
+                default:
+                    oci.treeNodeObject.textName = name;
+                    break;
             }
         }
     }
+
 }

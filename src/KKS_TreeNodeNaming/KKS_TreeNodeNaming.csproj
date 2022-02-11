@@ -71,6 +71,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TreeNodeNameing.SceneController.cs" />
     <Compile Include="TreeNodeNaming.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
