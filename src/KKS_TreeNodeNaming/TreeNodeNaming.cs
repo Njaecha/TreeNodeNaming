@@ -74,7 +74,7 @@ namespace TreeNodeNaming
                             uiActive = false;
                             break;
                         case KeyCode.Backspace:
-                            if (inputStringBuilder.Length > 0)
+                            if (inputStringBuilder.Length > 0 && cursorPosition > 0)
                             {
                                 inputStringBuilder.Remove(cursorPosition - 1, 1);
                                 cursorPosition--;
@@ -107,7 +107,7 @@ namespace TreeNodeNaming
                             inputStringBuilder.Insert(cursorPosition, Input.inputString);
                             if (a != inputStringBuilder.Length)
                             {
-                                cursorPosition++;
+                                cursorPosition = cursorPosition + Input.inputString.Length;
                                 renameCurrentItems(inputStringBuilder.ToString().Insert(cursorPosition, cursor));
                             }
                             break;
