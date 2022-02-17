@@ -18,12 +18,11 @@ namespace TreeNodeNaming
     [BepInDependency(ExtendedSave.GUID, ExtendedSave.Version)]
     [BepInDependency(KoikatuAPI.GUID, KoikatuAPI.VersionConst)]
     [BepInPlugin(GUID, PluginName, Version)]
-    [BepInProcess("CharaStudio")]
-    public class TreeNodeNaming : BaseUnityPlugin
+    public partial class TreeNodeNaming : BaseUnityPlugin
     {
         public const string PluginName = "TreeNodeNaming";
         public const string GUID = "org.njaecha.plugins.treenodenaming";
-        public const string Version = "1.1.1";
+        public const string Version = "1.1.0";
 
         internal new static ManualLogSource Logger;
 
@@ -121,8 +120,8 @@ namespace TreeNodeNaming
         {
             if (hotkey.Value.IsDown())
             {
-                if (treeNodeCtrl.selectNode == null) return;
-                inputStringBuilder.Remove(0, inputStringBuilder.Length);
+                if (treeNodeCtrl.selectNode == null || (treeNodeCtrl.selectNode.enableDelete == false && treeNodeCtrl.selectNode.enableChangeParent == false)) return;
+                inputStringBuilder.Clear();
                 inputStringBuilder.Append(treeNodeCtrl.selectNode.textName);
                 cursorPosition = inputStringBuilder.Length;
                 oldTnoNames.Clear();
