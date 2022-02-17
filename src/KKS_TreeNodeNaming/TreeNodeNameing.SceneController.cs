@@ -60,8 +60,8 @@ namespace TreeNodeNaming
             Dictionary<int, ObjectCtrlInfo> sceneObjects = Studio.Studio.Instance.dicObjectCtrl;
             foreach (int id in copiedItems.Keys)
             {
-                if (copiedItems[id] is OCIItem || copiedItems[id] is OCIChar)
-                    copiedItems[id].treeNodeObject.textName = sceneObjects[id].treeNodeObject.textName;
+                if (copiedItems[id].kind != 6)
+                    TreeNodeNaming.renameItem(copiedItems[id], sceneObjects[id].treeNodeObject.textName);
             }
         }
     }

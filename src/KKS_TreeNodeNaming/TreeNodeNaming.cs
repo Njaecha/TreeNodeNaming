@@ -23,7 +23,7 @@ namespace TreeNodeNaming
     {
         public const string PluginName = "TreeNodeNaming";
         public const string GUID = "org.njaecha.plugins.treenodenaming";
-        public const string Version = "1.1.0";
+        public const string Version = "1.1.1";
 
         internal new static ManualLogSource Logger;
 
