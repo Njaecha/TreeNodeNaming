@@ -12,6 +12,7 @@ using KKAPI.Studio.SaveLoad;
 using KKAPI.Utilities;
 using ExtensibleSaveFormat;
 using MessagePack;
+using HarmonyLib;
 
 namespace TreeNodeNaming
 {
@@ -23,7 +24,7 @@ namespace TreeNodeNaming
     {
         public const string PluginName = "TreeNodeNaming";
         public const string GUID = "org.njaecha.plugins.treenodenaming";
-        public const string Version = "1.1.1";
+        public const string Version = "1.2.0";
 
         internal new static ManualLogSource Logger;
 
@@ -36,8 +37,9 @@ namespace TreeNodeNaming
         private int cursorPosition;
 
         private ConfigEntry<KeyboardShortcut> hotkey;
+        internal static ConfigEntry<bool> autoRenaming;
 
-        private TreeNodeCtrl treeNodeCtrl;
+        private static TreeNodeCtrl treeNodeCtrl;
 
 
         void Awake()
@@ -47,7 +49,9 @@ namespace TreeNodeNaming
             StudioSaveLoadApi.RegisterExtraBehaviour<SceneController>(GUID);
             KeyboardShortcut defaultShortcut = new KeyboardShortcut(KeyCode.R, KeyCode.LeftShift);
             hotkey = Config.Bind("General", "Hotkey", defaultShortcut, "Press this key to rename selected objects");
+            autoRenaming = Config.Bind("General", "Automatic Renaming", true, "Automatically adds a counter to the name of objects that exist more than once");
             KKAPI.Studio.StudioAPI.StudioLoadedChanged += registerCtrls;
+            Harmony harmony = Harmony.CreateAndPatchAll(typeof(Hooks), null);
         }
 
         private void registerCtrls(object sender, EventArgs e)
@@ -185,6 +189,24 @@ namespace TreeNodeNaming
                     break;
             }
         }
-    }
 
+        public static List<string> getAllNodeTextNames()
+        {
+            return getAllNodeTextNames(new List<string>(), treeNodeCtrl.m_TreeNodeObject);
+        }
+
+        public static List<string> getAllNodeTextNames(List<string> names, List<TreeNodeObject> treeNodeObjects)
+        {
+            for (int i = 0; i < treeNodeObjects.Count; i++)
+            {
+                if (!(treeNodeObjects[i].parent != null && treeNodeObjects[i].enableChangeParent == false))
+                    names.Add(treeNodeObjects[i].textName);
+                if (treeNodeObjects[i].childCount > 0)
+                {
+                    names = getAllNodeTextNames(names, treeNodeObjects[i].child);
+                }
+            }
+            return names;
+        }
+    }
 }
